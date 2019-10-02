@@ -3,79 +3,103 @@
 #include <cmath>
 #include <vector>
 #include <iostream>
+#include <climits>
 
 namespace bit
 {
 
-#define u64 unsigned long long int
-#define u8 unsigned char
-
+template <typename Chunk_T = unsigned long long> //Chunk_T should be unsigned, gotta assert
 class Bitset
 {
-	u64 size_;
-	std::vector <u64> segments_;
+	static_assert(std::is_unsigned <Chunk_T>::value, "Non arithmetic unsigned type passed as template parameter.");
 
-public:
+	std::size_t size_;
+	const std::size_t chunk_size_;
+	std::vector <Chunk_T> chunks_;
 
 	class Iterator	//single bit encapsulation
 	{
-		u64 pos_;
-		Bitset &array_;
+		std::size_t pos_; //1gb would yield 8'000'000'000 bits => pos_ should be rather large...
+		Bitset <Chunk_T> &array_;
 		bool value_;
 
 	public:
 
-		Iterator(const u64, Bitset&);
+		Iterator(const std::size_t, Bitset <Chunk_T>&);
 
 		operator bool const();	//comparisons with bool type
 
 		Iterator& operator = (const bool);	//simulating access
 	};
 
-	Bitset(const u64);
+public:
 
-	bool get(const std::size_t);
+	Bitset(const std::size_t = 0);
 
-	Bitset& set();
+	bool get(const std::size_t) const;
 
-	Bitset& set(const std::size_t, const bool);
+	std::size_t size() const;
 
-	Bitset& reset();
+	Bitset <Chunk_T>& set();
 
-	Bitset& reset(const std::size_t);
+	Bitset <Chunk_T>& set(const std::size_t, const bool = true);
 
-	Bitset& flip();
+	Bitset <Chunk_T>& reset();
 
-	Bitset& flip(const std::size_t);
+	Bitset <Chunk_T>& reset(const std::size_t);
 
-	Bitset::Iterator operator [] (const std::size_t);
+	Bitset <Chunk_T>& flip();
 
-	void resize(const u64);
+	Bitset <Chunk_T>& flip(const std::size_t);
 
-	void resize(const u64, const bool);
+	Bitset <Chunk_T>::Iterator operator [] (const std::size_t) const;
 
-	void clear();
+	Bitset <Chunk_T>& resize(const std::size_t = 0);
 
-	friend std::ostream& operator << (std::ostream&, const Bitset&);
+	Bitset <Chunk_T>& resize(const std::size_t, const bool);
+
+	Bitset <Chunk_T>& clear();
+
+	Bitset <Chunk_T>& operator &= (const Bitset <Chunk_T>&);
+
+	Bitset <Chunk_T>& operator |= (const Bitset <Chunk_T>&);
+
+	Bitset <Chunk_T>& operator ^= (const Bitset <Chunk_T>&);
+
+	Bitset <Chunk_T> operator ~ () const;
+
+	Bitset <Chunk_T> operator << (const std::size_t) const;
+
+	Bitset <Chunk_T>& operator <<= (const std::size_t);
+
+	Bitset <Chunk_T> operator >> (const std::size_t) const;
+
+	Bitset <Chunk_T>& operator >>= (const std::size_t);
+
+	template <typename Chunk_FT>
+	friend std::ostream& operator << (std::ostream&, const Bitset <Chunk_FT>&);
 };
 
 
 
 //-------------------------class Iterator methods BEGIN-------------------------
 
-Bitset::Iterator::Iterator(const u64 pos, Bitset &array)
+template <typename Chunk_T> //non pure
+Bitset <Chunk_T>::Iterator::Iterator(const std::size_t pos, Bitset &array)
 	:
 	pos_(pos),
 	array_(array),
 	value_(array.get(pos))
 {};
 
-Bitset::Iterator::operator bool const() 
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>::Iterator::operator bool const() 
 {
 	return value_;
 }
 
-Bitset::Iterator& Bitset::Iterator::operator = (const bool value)
+template <typename Chunk_T> //non pure
+typename Bitset <Chunk_T>::Iterator& Bitset <Chunk_T>::Iterator::operator = (const bool value)
 {
 	array_.set(pos_, value);
 
@@ -85,130 +109,208 @@ Bitset::Iterator& Bitset::Iterator::operator = (const bool value)
 //-------------------------class Iterator methods END-------------------------
 
 
+/*============================================================================
+--------------------------class Bitset methods BEGIN--------------------------
+============================================================================*/
 
-//-------------------------class Bitset methods BEGIN-------------------------
-
-Bitset::Bitset(const u64 size = 0)
+template <typename Chunk_T>
+Bitset <Chunk_T>::Bitset(const std::size_t size)
 	:
 	size_(size),
-	segments_(size / 64 + (((size / 64) * 64) == size ? 0 : 1))
+	chunk_size_(sizeof(Chunk_T) * CHAR_BIT),
+	chunks_((size_ - 1) / chunk_size_ + 1)
 {};
 
-bool Bitset::get(const std::size_t pos)
+template <typename Chunk_T> //pure
+std::size_t Bitset <Chunk_T>::size() const
 {
-	u64 segment = pos / 64;
-	u8 bit_pos = pos % 64;
+	return size_;
+}
 
-	if(segments_[segment] & (1ULL << bit_pos))
+template <typename Chunk_T> //pure
+bool Bitset <Chunk_T>::get(const std::size_t pos) const
+{
+	std::size_t chunk_pos = pos / chunk_size_;
+	std::size_t bit_pos = pos % chunk_size_;
+
+	if(chunks_[chunk_pos] & (Chunk_T(1) << bit_pos)) //gotta make sure that chunk_t cast is fine...
 		return true;
 	else
 		return false;
 }
 
-Bitset& Bitset::set()
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::set()
 {
-	for(auto &itr : segments_)
-		itr = ~0ULL;
+	for(auto &itr : chunks_)
+		itr = ~Chunk_T(0);
 
 	return *this;
 }
 
-Bitset& Bitset::set(const std::size_t pos, const bool value = true)
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::set(const std::size_t pos, const bool value)
 {
-	u64 segment = pos / 64;
-	u8 bit_pos = pos % 64;
+	std::size_t chunk_pos = pos / chunk_size_;
+	std::size_t bit_pos = pos % chunk_size_;
 
 	if(value)
-		segments_[segment] |= (1ULL << bit_pos);
+		chunks_[chunk_pos] |= (Chunk_T(1) << bit_pos);
 	else
-		segments_[segment] &= ~(1ULL << bit_pos);
+		chunks_[chunk_pos] &= ~(Chunk_T(1) << bit_pos);
 
 	return *this;
 }
 
-Bitset& Bitset::reset()
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::reset()
 {
-	for(auto &itr : segments_)
-		itr = 0ULL;
+	for(auto &itr : chunks_)
+		itr = 0;
 
 	return *this;
 }
 
-Bitset& Bitset::reset(const std::size_t pos)
+template <typename Chunk_T> //recursively pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::reset(const std::size_t pos)
 {
 	set(pos, 0);
 
 	return *this;
 }
 
-Bitset& Bitset::flip()
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::flip()
 {
-	for(auto &itr : segments_)
+	for(auto &itr : chunks_)
 		itr = ~itr;
 
 	return *this;
 }
 
-Bitset& Bitset::flip(const std::size_t pos)
+template <typename Chunk_T> //pure 
+Bitset <Chunk_T>& Bitset <Chunk_T>::flip(const std::size_t pos)
 {
-	if((*this)[pos])
-		(*this)[pos] = false;
-	else
-		(*this)[pos] = true;
+	std::size_t chunk_pos = pos / chunk_size_;
+	std::size_t bit_pos = pos % chunk_size_;
+
+	chunks_[chunk_pos] ^= (Chunk_T(1) << bit_pos);
 
 	return *this;
 }
 
-Bitset::Iterator Bitset::operator [] (const std::size_t pos)
+template <typename Chunk_T> //pure
+typename Bitset <Chunk_T>::Iterator Bitset <Chunk_T>::operator [] (const std::size_t pos) const
 {
 	return Iterator(pos, *this);
 }
 
-void Bitset::resize(const u64 size = 0)
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::resize(const std::size_t size)
 {
 	size_ = size;
-	segments_.resize(size / 64 + (((size / 64) * 64) == size ? 0 : 1));
+	chunks_.resize((size_ - 1) / chunk_size_ + 1);
 }
 
-void Bitset::resize(const u64 size, const bool value)
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::resize(const std::size_t size, const bool value)
 {
 	size_ = size;
-	if(value)
-		segments_.resize(size / 64 + (((size / 64) * 64) == size ? 0 : 1), ~0ULL);
-	else
-		segments_.resize(size / 64 + (((size / 64) * 64) == size ? 0 : 1), 0ULL);
+	chunks_.resize((size_ - 1) / chunk_size_ + 1, value ? ~Chunk_T(0) : 0);
 }
 
-void Bitset::clear()
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::clear()
 {
 	size_ = 0;
-	segments_.clear();
+	chunks_.clear();
 }
 
-std::ostream& operator << (std::ostream &out, const Bitset &bits)
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::operator &= (const Bitset <Chunk_T> &rhs)
 {
-	for(int j = (bits.size_ % 64 == 0 ? 64 : bits.size_ % 64) - 1; j >= 0; --j)
-	{
-		if(bits.segments_[bits.segments_.size() - 1] & (1ULL << j))
+	std::size_t length;
+
+	if(size_ >= rhs.size_)
+		length = rhs.size_;
+	else
+		length = size_;
+
+	for(std::size_t itr = 0; itr < length; ++itr)
+		chunks_[itr] &= rhs.chunks_[itr];
+
+	return *this;
+}
+
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::operator |= (const Bitset <Chunk_T> &rhs)
+{
+	std::size_t length;
+
+	if(size_ >= rhs.size_)
+		length = rhs.size_;
+	else
+		length = size_;
+
+	for(std::size_t itr = 0; itr < length; ++itr)
+		chunks_[itr] |= rhs.chunks_[itr];
+
+	return *this;
+}
+
+template <typename Chunk_T> //pure
+Bitset <Chunk_T>& Bitset <Chunk_T>::operator ^= (const Bitset <Chunk_T> &rhs)
+{
+	std::size_t length;
+
+	if(size_ >= rhs.size_)
+		length = rhs.size_;
+	else
+		length = size_;
+
+	for(std::size_t itr = 0; itr < length; ++itr)
+		chunks_[itr] ^= rhs.chunks_[itr];
+
+	return *this;
+}
+
+template <typename Chunk_T> //pure
+Bitset <Chunk_T> Bitset <Chunk_T>::operator ~ () const
+{
+	Bitset <Chunk_T> flip(size_);
+
+	for(std::size_t itr = 0; itr < chunks_.size(); ++itr)
+		flip.chunks_[itr] = ~chunks_[itr];
+
+	return flip;
+}
+
+template <typename Chunk_T>
+Bitset <Chunk_T> Bitset <Chunk_T>::operator << (const std::size_t pos) const
+{
+	Bitset <Chunk_T> copy(*this);
+
+}
+
+template <typename Chunk_T> //pure
+std::ostream& operator << (std::ostream &out, const Bitset <Chunk_T> &mask)
+{
+	if(!mask.size_)
+		return out;
+
+	for(std::size_t itr = (mask.size_ % mask.chunk_size_ == 0 ? mask.chunk_size_ : mask.size_ % mask.chunk_size_) - 1; itr >= 0; --itr)
+		if(mask.chunks_[mask.chunks_.size() - 1] & (Chunk_T(1) << itr))
 			out << 1;
 		else
 			out << 0;
-	}
 
-	//out << std::endl;
-
-	for(int i = bits.segments_.size() - 2; i >= 0; --i)
-	{
-		for(int j = 63; j >= 0; --j)
-		{
-			if(bits.segments_[i] & (1ULL << j))
+	for(std::size_t itr = mask.chunks_.size() - 2; itr >= 0; --itr)
+		for(std::size_t jtr = mask.chunk_size_ - 1; jtr >= 0; --jtr)
+			if(mask.chunks_[itr] & (Chunk_T(1) << jtr))
 				out << 1;
 			else
 				out << 0;
-		}
 
-		//out << std::endl;
-	}
 
 	return out;
 }

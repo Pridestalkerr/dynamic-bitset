@@ -4,7 +4,7 @@
 
 int main()
 {
-	bit::Bitset b(130);
+	/*bit::Bitset b(130);
 	b.set(0);
 	b.set(1);
 	b.set(2);
@@ -16,6 +16,10 @@ int main()
 	b[0] = false;
 	std::cout << b << std::endl;
 	b.flip(0);
-	std::cout << b << std::endl;
+	std::cout << b << std::endl;*/
+
+	bit::Bitset <> b(130);
+	b.set();
+	std::cout << b;
 	return 0;
 }
