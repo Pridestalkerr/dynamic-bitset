@@ -14,7 +14,7 @@ class Bitset
 	static_assert(std::is_unsigned <Chunk_T>::value, "Non arithmetic unsigned type passed as template parameter.");
 
 	std::size_t size_;
-	const std::size_t chunk_size_;
+	std::size_t chunk_size_;
 	std::vector <Chunk_T> chunks_;
 
 	class Iterator	//single bit encapsulation
@@ -52,7 +52,7 @@ public:
 
 	Bitset <Chunk_T>& flip(const std::size_t);
 
-	Bitset <Chunk_T>::Iterator operator [] (const std::size_t) const;
+	Bitset <Chunk_T>::Iterator operator [] (const std::size_t);
 
 	Bitset <Chunk_T>& resize(const std::size_t = 0);
 
@@ -200,7 +200,7 @@ Bitset <Chunk_T>& Bitset <Chunk_T>::flip(const std::size_t pos)
 }
 
 template <typename Chunk_T> //pure
-typename Bitset <Chunk_T>::Iterator Bitset <Chunk_T>::operator [] (const std::size_t pos) const
+typename Bitset <Chunk_T>::Iterator Bitset <Chunk_T>::operator [] (const std::size_t pos)
 {
 	return Iterator(pos, *this);
 }
@@ -288,8 +288,75 @@ Bitset <Chunk_T> Bitset <Chunk_T>::operator ~ () const
 template <typename Chunk_T>
 Bitset <Chunk_T> Bitset <Chunk_T>::operator << (const std::size_t pos) const
 {
-	Bitset <Chunk_T> copy(*this);
+	if(!pos)
+		return *this;
 
+	if(pos >= size_)
+		return Bitset <Chunk_T>(size_);
+
+	Bitset <Chunk_T> copy(size_); //empty bitset
+
+	std::size_t left = pos % chunk_size_;
+	std::size_t right = chunk_size_ - left;
+	std::size_t chunk_pos = pos / chunk_size_;
+	std::size_t itr = 0;
+
+	if(pos % chunk_size_)
+	{
+		//split chunk shift
+		while(chunk_pos < chunks_.size())
+		{
+			copy.chunks_[chunk_pos] |= chunks_[itr] << left;
+			copy.chunks_[chunk_pos + 1] |= chunks_[itr] >> right;
+
+			chunk_pos++;
+			itr++;
+		}
+		copy.chunks_[chunk_pos] |= chunks_[itr] << left;
+	}
+	else
+		//full chunk shift
+		for(std::size_t itr = 0; itr + chunk_pos < chunks_.size(); ++itr)
+			copy.chunks_[itr + chunk_pos] = chunks_[itr];
+
+	return copy;
+}
+
+template <typename Chunk_T>
+Bitset <Chunk_T> Bitset <Chunk_T>::operator >> (const std::size_t pos) const
+{
+	if(!pos)
+		return *this;
+	
+	if(pos >= size_)
+		return Bitset <Chunk_T>(size_);
+
+	Bitset <Chunk_T> copy(size_);
+
+	std::size_t left = pos % chunk_size_;
+	std::size_t right = chunk_size_ - left;
+	std::size_t chunk_pos = pos / chunk_size_;
+	std::size_t itr = 0;
+
+	if(pos % chunk_size_)
+	{
+		//split chunk shift
+		while(chunk_pos < chunks_.size())
+		{
+			copy.chunks_[chunk_pos] |= chunks_[itr] << left;
+			copy.chunks_[chunk_pos + 1] |= chunks_[itr] >> right;
+
+			chunk_pos++;
+			itr++;
+		}
+		copy.chunks_[chunk_pos] |= chunks_[itr] << left;
+	}
+	else
+		//full chunk shift
+		for(std::size_t itr = 0; itr + chunk_pos < chunks_.size(); ++itr)
+			copy.chunks_[itr + chunk_pos] = chunks_[itr];
+
+	return copy;
 }
 
 template <typename Chunk_T> //pure
@@ -298,19 +365,20 @@ std::ostream& operator << (std::ostream &out, const Bitset <Chunk_T> &mask)
 	if(!mask.size_)
 		return out;
 
-	for(std::size_t itr = (mask.size_ % mask.chunk_size_ == 0 ? mask.chunk_size_ : mask.size_ % mask.chunk_size_) - 1; itr >= 0; --itr)
+	for(std::size_t itr = (mask.size_ % mask.chunk_size_ == 0 ? mask.chunk_size_ : mask.size_ % mask.chunk_size_); itr-- > 0;)
+	{
 		if(mask.chunks_[mask.chunks_.size() - 1] & (Chunk_T(1) << itr))
 			out << 1;
 		else
 			out << 0;
+	}
 
-	for(std::size_t itr = mask.chunks_.size() - 2; itr >= 0; --itr)
-		for(std::size_t jtr = mask.chunk_size_ - 1; jtr >= 0; --jtr)
+	for(std::size_t itr = mask.chunks_.size() - 1; itr-- > 0;)
+		for(std::size_t jtr = mask.chunk_size_; jtr-- > 0;)
 			if(mask.chunks_[itr] & (Chunk_T(1) << jtr))
 				out << 1;
 			else
 				out << 0;
-
 
 	return out;
 }
