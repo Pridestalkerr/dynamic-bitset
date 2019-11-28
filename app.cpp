@@ -6,10 +6,10 @@
 
 int main()
 {
-	bit::Bitset <unsigned char> b(64);
-	b.set();
+	bit::Bitset <unsigned char> b(2);
+	b.set(0);
 	std::cout << b << std::endl;
-	std::cout << (b << 63) << std::endl;
+	/*std::cout << (b << 63) << std::endl;
 	b[63] = false;
 	b[8] = false;
 	b[16] = false;
@@ -27,6 +27,6 @@ int main()
 	std::cout << b << std::endl;
 	b >>= 16;
 	std::cout << b << std::endl;
-	b.test(333);
+	b.test(333);*/
 	return 0;
 }

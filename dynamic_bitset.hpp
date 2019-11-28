@@ -26,7 +26,7 @@ class Bitset
 {
 private:
 
-	static_assert(std::is_unsigned <Chunk_T>::value, "Non arithmetic unsigned type passed as template parameter.");
+	static_assert(std::is_integral <Chunk_T>::value, "Non integral type passed as template parameter.");
 
 	std::size_t size_;
 	std::size_t chunk_size_;
@@ -124,6 +124,21 @@ public:
 
 	template <typename Chunk_FT, typename Allocator_FT, typename Char_T, typename Traits_T>
 	friend std::basic_ostream <Char_T, Traits_T>& operator << (std::basic_ostream <Char_T, Traits_T>&, const Bitset <Chunk_FT, Allocator_FT>&);
+
+	//out of range helper
+	std::string throw_msg_builder(const std::string &which, const std::size_t pos) const
+	{
+		return std::string(		
+			"bit::Bitset::"
+			+ which
+			+ "(): pos (which is " 
+			+ std::to_string(pos) 
+			+ ") >= size() (which is " 
+			+ std::to_string(size_) 
+			+ ")"
+		);
+	}
+	
 };
 
 
@@ -152,6 +167,12 @@ typename Bitset <Chunk_T, Allocator_T>::Iterator& Bitset <Chunk_T, Allocator_T>:
 	return *this;
 }
 
+template <typename Chunk_T, typename Allocator_T> //pure
+typename Bitset <Chunk_T, Allocator_T>::Iterator Bitset <Chunk_T, Allocator_T>::operator [] (const std::size_t pos)
+{
+	return Iterator(pos, *this);
+}
+
 //-------------------------class Iterator methods END-------------------------
 
 
@@ -160,11 +181,11 @@ typename Bitset <Chunk_T, Allocator_T>::Iterator& Bitset <Chunk_T, Allocator_T>:
 ============================================================================*/
 
 template <typename Chunk_T, typename Allocator_T>
-Bitset <Chunk_T, Allocator_T>::Bitset(const std::size_t size)
+Bitset <Chunk_T, Allocator_T>::Bitset(const std::size_t size) //negative size should throw a bad alloc on the vectors part
 	:
 	size_(size),
 	chunk_size_(sizeof(Chunk_T) * CHAR_BIT),
-	chunks_((size_ - 1) / chunk_size_ + 1, Allocator_T())
+	chunks_(size_ > 0 ? ((size_ - 1) / chunk_size_ + 1) : 0, Chunk_T(0), Allocator_T()) //unsigned overload on size=0
 {};
 
 template <typename Chunk_T, typename Allocator_T> //pure
@@ -181,9 +202,13 @@ std::basic_string <Char_T, Traits_T, Alloc_T> Bitset<Chunk_T, Allocator_T>::to_s
 
 	std::size_t pos = size_;
 	for(auto chunk : chunks_)
-		for(std::size_t jtr = chunk_size_; jtr-- > 0;)
-			if(chunk & (static_cast <Chunk_T>(1) << jtr))
-				Traits_T::assign(tmp[--pos], one);
+	{
+		for(std::size_t bit_pos = 0; bit_pos < chunk_size_, pos-- > 0; ++ bit_pos)
+		{
+			if(chunk & (Chunk_T(1) << bit_pos))
+				Traits_T::assign(tmp[pos], one);
+		}
+	}
 
 	return tmp;
 }
@@ -193,28 +218,13 @@ bool Bitset <Chunk_T, Allocator_T>::test(const std::size_t pos) const
 {
 	if(pos >= size_)
 	{
-		/*throw std::out_of_range(	"Bitset< " 
-									+ std::string(abi::__cxa_demangle(typeid(Chunk_T).name(), 0, 0, 0)) 
-									+ " , " 
-									+ std::string(abi::__cxa_demangle(typeid(Allocator_T).name(), 0, 0, 0)) 
-									+ " >::test(const std::size_t) : index = "
-									+ std::to_string(pos)
-									+ " vs size = "
-									+ std::to_string(size_)
-		);*/
-		throw std::out_of_range(
-									"bit::Bitset::test(): pos (which is " 
-									+ std::to_string(pos) 
-									+ ") > size() (which is " 
-									+ std::to_string(size_) 
-									+ ")"
-		);
+		throw std::out_of_range(throw_msg_builder("test", pos));
 	}
 
 	std::size_t chunk_pos = pos / chunk_size_;
 	std::size_t bit_pos = pos % chunk_size_;
 
-	if(chunks_[chunk_pos] & (static_cast <Chunk_T>(1) << bit_pos))
+	if(chunks_[chunk_pos] & (Chunk_T(1) << bit_pos))
 		return true;
 	else
 		return false;
@@ -223,8 +233,9 @@ bool Bitset <Chunk_T, Allocator_T>::test(const std::size_t pos) const
 template <typename Chunk_T, typename Allocator_T> //pure
 Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set()
 {
-	for(auto &itr : chunks_)
-		itr = ~static_cast <Chunk_T>(0);
+	/*for(auto &itr : chunks_)
+		itr = ~Chunk_T(0);*/
+	std::fill(chunks_.begin(), chunks_.end(), ~Chunk_T(0));
 
 	return *this;
 }
@@ -232,13 +243,18 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set()
 template <typename Chunk_T, typename Allocator_T> //pure
 Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set(const std::size_t pos, const bool value)
 {
+	if(pos >= size_)
+	{
+		throw std::out_of_range(throw_msg_builder("set", pos));
+	}
+
 	std::size_t chunk_pos = pos / chunk_size_;
 	std::size_t bit_pos = pos % chunk_size_;
 
 	if(value)
-		chunks_[chunk_pos] |= (static_cast <Chunk_T>(1) << bit_pos);
+		chunks_[chunk_pos] |= (Chunk_T(1) << bit_pos);
 	else
-		chunks_[chunk_pos] &= ~(static_cast <Chunk_T>(1) << bit_pos);
+		chunks_[chunk_pos] &= ~(Chunk_T(1) << bit_pos);
 
 	return *this;
 }
@@ -246,8 +262,9 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set(const std::siz
 template <typename Chunk_T, typename Allocator_T> //pure
 Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::reset()
 {
-	for(auto &itr : chunks_)
-		itr = 0;
+	/*for(auto &itr : chunks_)
+		itr = Chunk_T(0);*/
+	std::fill(chunks_.begin(), chunks_.end(), Chunk_T(0));
 
 	return *this;
 }
@@ -265,6 +282,7 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip()
 {
 	for(auto &itr : chunks_)
 		itr = ~itr;
+	//std::for_each(chunks_.begin(), chunks_.end(), [](Chunk_T &element) {element = ~element;});
 
 	return *this;
 }
@@ -272,32 +290,31 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip()
 template <typename Chunk_T, typename Allocator_T> //pure 
 Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip(const std::size_t pos)
 {
+	if(pos >= size_)
+	{
+		throw std::out_of_range(throw_msg_builder("flip", pos));
+	}
+
 	std::size_t chunk_pos = pos / chunk_size_;
 	std::size_t bit_pos = pos % chunk_size_;
 
-	chunks_[chunk_pos] ^= (static_cast <Chunk_T>(1) << bit_pos);
+	chunks_[chunk_pos] ^= (Chunk_T(1) << bit_pos);
 
 	return *this;
-}
-
-template <typename Chunk_T, typename Allocator_T> //pure
-typename Bitset <Chunk_T, Allocator_T>::Iterator Bitset <Chunk_T, Allocator_T>::operator [] (const std::size_t pos)
-{
-	return Iterator(pos, *this);
 }
 
 template <typename Chunk_T, typename Allocator_T> //pure
 Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::resize(const std::size_t size)
 {
 	size_ = size;
-	chunks_.resize((size_ - 1) / chunk_size_ + 1);
+	chunks_.resize(size_ > 0 ? ((size_ - 1) / chunk_size_ + 1) : 0);
 }
 
 template <typename Chunk_T, typename Allocator_T> //pure
 Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::resize(const std::size_t size, const bool value)
 {
 	size_ = size;
-	chunks_.resize((size_ - 1) / chunk_size_ + 1, value ? ~static_cast <Chunk_T>(0) : 0);
+	chunks_.resize(size_ > 0 ? ((size_ - 1) / chunk_size_ + 1) : 0, value ? ~Chunk_T(0) : Chunk_T(0));
 }
 
 template <typename Chunk_T, typename Allocator_T> //pure
@@ -310,8 +327,10 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::clear()
 template <typename Chunk_T, typename Allocator_T> //pure
 Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator &= (const Bitset <Chunk_T, Allocator_T> &rhs)
 {
+	//should the bitset grow in size if rhs is larger?
 	std::size_t length;
 
+	//all of this can be done in a range loop
 	if(size_ >= rhs.size_)
 		length = rhs.size_;
 	else
@@ -358,6 +377,7 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator ^= (const
 template <typename Chunk_T, typename Allocator_T> //pure
 Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator ~ () const
 {
+	//reserve and push_back should be faster?
 	Bitset <Chunk_T, Allocator_T> flip(size_);
 
 	for(std::size_t itr = 0; itr < chunks_.size(); ++itr)
@@ -408,7 +428,7 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator <<= (cons
 
 	if(pos >= size_)
 	{
-		std::fill(chunks_.begin(), chunks_.end(), static_cast <Chunk_T>(0));
+		std::fill(chunks_.begin(), chunks_.end(), Chunk_T(0));
 		return *this;
 	}
 
@@ -431,7 +451,7 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator <<= (cons
 			chunks_[itr] = chunks_[itr - chunk_offset];
 	}
 
-	std::fill(chunks_.begin(), chunks_.begin() + chunk_offset, static_cast <Chunk_T>(0));
+	std::fill(chunks_.begin(), chunks_.begin() + chunk_offset, Chunk_T(0));
 
 	return *this;
 }
@@ -479,7 +499,7 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator >>= (cons
 
 	if(pos >= size_)
 	{
-		std::fill(chunks_.begin(), chunks_.end(), static_cast <Chunk_T>(0));
+		std::fill(chunks_.begin(), chunks_.end(), Chunk_T(0));
 		return *this;
 	}
 
@@ -502,7 +522,7 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator >>= (cons
 			chunks_[itr] = chunks_[itr + chunk_offset];
 	}
 
-	std::fill(chunks_.begin() + chunks_.size() - chunk_offset, chunks_.end(), static_cast <Chunk_T>(0));
+	std::fill(chunks_.begin() + chunks_.size() - chunk_offset, chunks_.end(), Chunk_T(0));
 
 	return *this;
 }
