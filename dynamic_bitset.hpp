@@ -52,7 +52,7 @@ private:
 
 //helpers
 
-	std::size_t needed_chunks_(const std::size_t size)
+	std::size_t needed_chunks_(const std::size_t size) //imp
 	{
 		return size / chunk_size_ + Chunk_T(size % chunk_size_ > 0); //ceil it
 	}
@@ -89,7 +89,7 @@ public:
 
 //-------------------------CAPACITY-------------------------
 
-	std::size_t size() const;
+	std::size_t size() const; //imp
 
 	bool empty() const; //
 
@@ -115,7 +115,7 @@ public:
 	Bitset <Chunk_T, Allocator_T>& flip(const std::size_t);
 
 	Bitset <Chunk_T, Allocator_T>& resize(const std::size_t = 0);
-	Bitset <Chunk_T, Allocator_T>& resize(const std::size_t, const bool);
+	Bitset <Chunk_T, Allocator_T>& resize(const std::size_t, const bool); //imp
 
 	Bitset <Chunk_T, Allocator_T>& operator &= (const Bitset <Chunk_T, Allocator_T>&);
 	Bitset <Chunk_T, Allocator_T>& operator |= (const Bitset <Chunk_T, Allocator_T>&);
@@ -130,15 +130,15 @@ public:
 //-------------------------CONVERSIONS-------------------------
 
 	template <typename Char_T, typename Traits_T, typename Alloc_T>
-	std::basic_string <Char_T, Traits_T, Alloc_T> to_string(const Char_T, const Char_T) const;
+	std::basic_string <Char_T, Traits_T, Alloc_T> to_string(const Char_T, const Char_T) const; //imp
 
 //-------------------------NON MEMBER FUNCTIOS-------------------------
 
 	template <typename Chunk_FT, typename Allocator_FT, typename Char_T, typename Traits_T>
-	friend std::basic_ostream <Char_T, Traits_T>& operator << (std::basic_ostream <Char_T, Traits_T>&, const Bitset <Chunk_FT, Allocator_FT>&);
+	friend std::basic_ostream <Char_T, Traits_T>& operator << (std::basic_ostream <Char_T, Traits_T>&, const Bitset <Chunk_FT, Allocator_FT>&); //imp
 
 	//out of range helper
-	std::string throw_msg_builder(const std::string &which, const std::size_t pos) const
+	std::string throw_msg_builder(const std::string &which, const std::size_t pos) const //imp
 	{
 		return std::string(		
 			"bit::Bitset::"
@@ -379,7 +379,7 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::clear()
 	chunks_.clear();
 }
 
-template <typename Chunk_T, typename Allocator_T> //pure
+/*template <typename Chunk_T, typename Allocator_T> //pure
 Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator &= (const Bitset <Chunk_T, Allocator_T> &rhs)
 {
 	//should the bitset grow in size if rhs is larger?
@@ -439,12 +439,15 @@ Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator ~ () const
 		flip.chunks_[itr] = ~chunks_[itr];
 
 	return flip;
-}
+}*/
+
+
 
 template <typename Chunk_T, typename Allocator_T>
 Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator << (const std::size_t pos) const
 {
 	//shift chunks to right (increase value)
+	//unused bits should still be outside reach, therefore no need to mess with them
 	if(!pos)
 		return *this;
 
@@ -453,7 +456,7 @@ Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator << (const 
 
 	Bitset <Chunk_T, Allocator_T> shifted(size_); //empty bitset
 
-	const std::size_t left_offset = pos % chunk_size_; 				//left part (smaller) of the chunk will become the right (larger) part of the new chunk
+	const std::size_t left_offset = pos % chunk_size_;				//left part (smaller) of the chunk will become the right (larger) part of the new chunk
 	const std::size_t right_offset = chunk_size_ - left_offset; 	//right part (larger) of the chunk will become the left (smallest) part of the new chunk
 	const std::size_t chunk_offset = pos / chunk_size_;				//first chunk to be set in the new bitset
 
@@ -515,6 +518,7 @@ template <typename Chunk_T, typename Allocator_T>
 Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator >> (const std::size_t pos) const
 {
 	//shift chunks to left (decrease value)
+	//unused bits are definetely a problem...
 	if(!pos)
 		return *this;
 

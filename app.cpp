@@ -1,14 +1,90 @@
 #include <iostream>
-#include "dynamic_bitset.hpp"
-#include <bitset>
+#include "dynamic_bitset_cleanup.hpp"
 #include <vector>
-#include <type_traits>
 
 int main()
 {
-	bit::Bitset <unsigned char> b(2);
+	bit::Bitset <unsigned char> b({true,true,false,false,true,false});
+	//b.set(0);
+	std::cout << b << std::endl;
+	b.clear();
+	std::cout << b << std::endl;
+	b.resize(3);
+	std::cout << b << std::endl;
+	b.resize(20, true);
+	std::cout << b << std::endl;
+	b.resize(24, false); //can be used as fill lol
+	std::cout << b << std::endl;
+	b.resize(24, true); //can be used as fill lol
+	std::cout << b << std::endl;
+	b.resize(25, true); //can be used as fill lol
+	std::cout << b << std::endl;
+	std::cout << b.to_string('f', 't') << std::endl;
+	b.set();
+	std::cout << b << std::endl;
+	b.set(0, false);
+	std::cout << b << std::endl;
+	b.set(0, true);
+	std::cout << b << std::endl;
+	b.set(0, false);
+	std::cout << b << std::endl;
+	b.set(2, false);
+	std::cout << b << std::endl;
+	b.set(7, false);
+	std::cout << b << std::endl;
+	b.set(9, false);
+	std::cout << b << std::endl;
+	b.set(24, false);
+	std::cout << b << std::endl;
+	b.reset();
+	std::cout << b << std::endl;
+	b.reset();
+	std::cout << b << std::endl;
 	b.set(0);
 	std::cout << b << std::endl;
+	b.set();
+	std::cout << b << std::endl;
+	b.reset(0);
+	std::cout << b << std::endl;
+	b.reset(7);
+	std::cout << b << std::endl;
+	b.reset(9);
+	std::cout << b << std::endl;
+	b.flip();
+	std::cout << b << std::endl;
+	b.flip();
+	std::cout << b << std::endl;
+	b.flip(0);
+	std::cout << b << std::endl;
+	b.flip(7);
+	std::cout << b << std::endl;
+	b.flip(9);
+	std::cout << b << std::endl;
+	b.flip(0);
+	std::cout << b << std::endl;
+	b.flip(7);
+	std::cout << b << std::endl;
+	b.flip(9);
+	std::cout << b << std::endl;
+
+	//b.resize(24, true);
+	b.set();
+	std::cout << b << std::endl;
+	//b <<= 24;
+	std::cout << (b>>24) << std::endl;
+
+	bit::Bitset <unsigned char> a (32);
+	//TEST IN PLACE OPERATORS
+
+
+
+	b.set();
+	std::cout << b << std::endl;
+	std::cout << a << std::endl;
+	a ^= b;
+	std::cout << b << std::endl;
+	std::cout << a << std::endl;
+
 	/*std::cout << (b << 63) << std::endl;
 	b[63] = false;
 	b[8] = false;
