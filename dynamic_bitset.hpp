@@ -1,185 +1,105 @@
 #pragma once
 
-#include <cmath>
 #include <vector>
 #include <iostream>
 #include <climits>
 #include <algorithm>
-#include <memory>
 #include <cctype>
-#include <cxxabi.h>
 
-/*template<typename T, typename = void>
-inline constexpr bool is_arithmetic_v = std::false_type{};
-
-template<typename T>
-inline constexpr bool is_arithmetic_v<
-    T, 
-    std::void_t<decltype(std::declval<T>() + std::declval<T>())>
-> = std::true_type{};*/
 
 namespace bit
 {
 
-template <typename Chunk_T = unsigned long long, typename Allocator_T = std::allocator <Chunk_T>> //Chunk_T should be unsigned, gotta assert
+
+template <typename Chunk_T = unsigned long long, typename Allocator_T = std::allocator <Chunk_T>>
 class Bitset
 {
 private:
 
-	static_assert(std::is_integral <Chunk_T>::value, "Non integral type passed as template parameter.");
+	std::size_t size_;																			//size of the bitset 
+	std::vector <Chunk_T> chunks_;																//array containing the bitset
+	constexpr static std::size_t chunk_size_ = Bitset <Chunk_T, Allocator_T>::sizeof_chunk_();	//how many bits can a chunk hold
 
-	std::size_t size_;
-	std::size_t chunk_size_;
-	std::vector <Chunk_T> chunks_;
-	const Chunk_T set_chunk_; 		//1111 1111
-	const Chunk_T one_chunk_;		//0000 0001
-	const Chunk_T zero_chunk_;		//0000 0000
-
-	class Iterator	//single bit encapsulation
-	{
-		std::size_t pos_;
-		Bitset <Chunk_T, Allocator_T> &array_;
-		bool value_;
-
-	public:
-
-		Iterator(const std::size_t, Bitset <Chunk_T, Allocator_T>&);
-
-		operator bool const();	//comparisons with bool type
-
-		Iterator& operator = (const bool);	//simulating access
-	};
-
-//helpers
-
-	std::size_t needed_chunks_(const std::size_t size) //imp
-	{
-		return size / chunk_size_ + Chunk_T(size % chunk_size_ > 0); //ceil it
-	}
+	//so we dont compute these a billion times, at runtime
+	constexpr static Chunk_T set_chunk_ = ~Chunk_T(0); 											//1111 1111
+	constexpr static Chunk_T one_chunk_ = Chunk_T(1);											//0000 0001
+	constexpr static Chunk_T zero_chunk_ = Chunk_T(0);											//0000 0000
 
 public:
 
-	Bitset(const std::size_t = 0, const bool value = false); //imp
+	constexpr explicit Bitset(const std::size_t = 0, const bool value = false); 				//default constructor							std::vector::vector() (3)
 
-	constexpr Bitset(const std::initializer_list <bool> init);	//imp
+	constexpr explicit Bitset(const std::initializer_list <bool>);								//initializer list constructor					std::vector::vector() (9)
 
-	~Bitset() = default;	//imp
+	~Bitset() noexcept = default;																//default destructor							std::vector::~vector()
+
 
 //-------------------------ELEMENT ACCESS-------------------------
 
-	bool test(const std::size_t) const; //imp
+	constexpr bool test(const std::size_t) const;
 
-	bool all() const;//
-	bool any() const;//
-	bool none() const;//
-
-	std::size_t count() const;//
-
-	typename Bitset <Chunk_T, Allocator_T>::Iterator operator [] (const std::size_t);
-
-	typename Bitset <Chunk_T, Allocator_T>::Iterator at(const std::size_t); //
-
-	typename Bitset <Chunk_T, Allocator_T>::Iterator front(); //
-
-	typename Bitset <Chunk_T, Allocator_T>::Iterator back(); //
-
-	Chunk_T* data(); //
-
-//-------------------------ITERATORS-------------------------
 
 //-------------------------CAPACITY-------------------------
 
-	std::size_t size() const; //imp
+	constexpr std::size_t size() const noexcept;
 
-	bool empty() const; //
-
-	std::size_t max_size() const; //
-
-	void reserve(const std::size_t); //
-
-	std::size_t capacity() const; //
-
-	void shrink_to_fit(); //
 
 //-------------------------MODIFIERS-------------------------
 
-	Bitset <Chunk_T, Allocator_T>& clear();	//imp
+	constexpr Bitset <Chunk_T, Allocator_T>& clear() noexcept;
 
-	Bitset <Chunk_T, Allocator_T>& set();
-	Bitset <Chunk_T, Allocator_T>& set(const std::size_t, const bool = true);
+	constexpr Bitset <Chunk_T, Allocator_T>& resize(const std::size_t = 0, const bool = false);
 
-	Bitset <Chunk_T, Allocator_T>& reset();
-	Bitset <Chunk_T, Allocator_T>& reset(const std::size_t);
 
-	Bitset <Chunk_T, Allocator_T>& flip();
-	Bitset <Chunk_T, Allocator_T>& flip(const std::size_t);
+	constexpr Bitset <Chunk_T, Allocator_T>& set();
+	constexpr Bitset <Chunk_T, Allocator_T>& set(const std::size_t, const bool = true);
 
-	Bitset <Chunk_T, Allocator_T>& resize(const std::size_t = 0);
-	Bitset <Chunk_T, Allocator_T>& resize(const std::size_t, const bool); //imp
+	constexpr Bitset <Chunk_T, Allocator_T>& reset();
+	constexpr Bitset <Chunk_T, Allocator_T>& reset(const std::size_t);
 
-	Bitset <Chunk_T, Allocator_T>& operator &= (const Bitset <Chunk_T, Allocator_T>&);
-	Bitset <Chunk_T, Allocator_T>& operator |= (const Bitset <Chunk_T, Allocator_T>&);
-	Bitset <Chunk_T, Allocator_T>& operator ^= (const Bitset <Chunk_T, Allocator_T>&);
-	Bitset <Chunk_T, Allocator_T> operator ~ () const;
+	constexpr Bitset <Chunk_T, Allocator_T>& flip();
+	constexpr Bitset <Chunk_T, Allocator_T>& flip(const std::size_t);
 
-	Bitset <Chunk_T, Allocator_T> operator << (const std::size_t) const;
-	Bitset <Chunk_T, Allocator_T>& operator <<= (const std::size_t);
-	Bitset <Chunk_T, Allocator_T> operator >> (const std::size_t) const;
-	Bitset <Chunk_T, Allocator_T>& operator >>= (const std::size_t);
+	constexpr Bitset <Chunk_T, Allocator_T>& operator &= (Bitset <Chunk_T, Allocator_T>&);
+	constexpr Bitset <Chunk_T, Allocator_T>& operator |= (Bitset <Chunk_T, Allocator_T>&);
+	constexpr Bitset <Chunk_T, Allocator_T>& operator ^= (Bitset <Chunk_T, Allocator_T>&);
+	constexpr Bitset <Chunk_T, Allocator_T> operator ~ () const;
+
+	constexpr Bitset <Chunk_T, Allocator_T> operator << (const std::size_t) const;
+	constexpr Bitset <Chunk_T, Allocator_T>& operator <<= (const std::size_t);
+	constexpr Bitset <Chunk_T, Allocator_T> operator >> (const std::size_t);					//cant be const since bit sanitization must be dealt with
+	constexpr Bitset <Chunk_T, Allocator_T>& operator >>= (const std::size_t);
+
 
 //-------------------------CONVERSIONS-------------------------
 
-	template <typename Char_T, typename Traits_T, typename Alloc_T>
-	std::basic_string <Char_T, Traits_T, Alloc_T> to_string(const Char_T, const Char_T) const; //imp
+	template <typename Char_T = char, typename Traits_T = std::char_traits <Char_T>, typename Str_Alloc_T = std::allocator <Char_T>>
+	constexpr std::basic_string <Char_T, Traits_T, Str_Alloc_T> to_string(const Char_T = Char_T('0'), const Char_T = Char_T('1')) const;
+
 
 //-------------------------NON MEMBER FUNCTIOS-------------------------
 
 	template <typename Chunk_FT, typename Allocator_FT, typename Char_T, typename Traits_T>
-	friend std::basic_ostream <Char_T, Traits_T>& operator << (std::basic_ostream <Char_T, Traits_T>&, const Bitset <Chunk_FT, Allocator_FT>&); //imp
+	friend std::basic_ostream <Char_T, Traits_T>& operator << (std::basic_ostream <Char_T, Traits_T>&, const Bitset <Chunk_FT, Allocator_FT>&);
 
-	//out of range helper
-	std::string throw_msg_builder(const std::string &which, const std::size_t pos) const //imp
-	{
-		return std::string(		
-			"bit::Bitset::"
-			+ which
-			+ "(): pos (which is " 
-			+ std::to_string(pos) 
-			+ ") >= size() (which is " 
-			+ std::to_string(size_) 
-			+ ")"
-		);
-	}
+private:
+
+	//-------------------------helpers/getters-------------------------
+
+	constexpr std::size_t needed_chunks_(const std::size_t size) const noexcept; 				//just a ceil function
+
+	constexpr static std::size_t sizeof_chunk_() noexcept;										//chunk_size_ compile time calculator
+
+	constexpr std::string oor_msg_builder_(const std::string&, const std::size_t) const;		//out of range which/pos string formatter
+
+	constexpr std::size_t chunk_pos_(const std::size_t) const noexcept;
+
+	constexpr std::size_t bit_pos_(const std::size_t) const noexcept;
+
+	void set_unused_bits_(const bool = false);													//sanitization tool
 	
 };
 
-
-
-//-------------------------class Iterator methods BEGIN-------------------------
-
-template <typename Chunk_T, typename Allocator_T> //non pure
-Bitset <Chunk_T, Allocator_T>::Iterator::Iterator(const std::size_t pos, Bitset <Chunk_T, Allocator_T> &array)
-	:
-	pos_(pos),
-	array_(array),
-	value_(array.test(pos))
-{};
-
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>::Iterator::operator bool const() 
-{
-	return value_;
-}
-
-template <typename Chunk_T, typename Allocator_T> //non pure
-typename Bitset <Chunk_T, Allocator_T>::Iterator& Bitset <Chunk_T, Allocator_T>::Iterator::operator = (const bool value)
-{
-	array_.set(pos_, value);
-
-	return *this;
-}
-
-//-------------------------class Iterator methods END-------------------------
 
 
 /*
@@ -188,153 +108,134 @@ typename Bitset <Chunk_T, Allocator_T>::Iterator& Bitset <Chunk_T, Allocator_T>:
 ============================================================================
 */
 
-
-
 //-------------------------constructors-------------------------
 
 template <typename Chunk_T, typename Allocator_T>
-Bitset <Chunk_T, Allocator_T>::Bitset(const std::size_t size, const bool value) //negative size should throw a bad alloc on the vectors part(make sure)
+constexpr Bitset <Chunk_T, Allocator_T>::Bitset(const std::size_t size, const bool value)
 	:
 	size_(size),
-	chunk_size_(sizeof(Chunk_T) * CHAR_BIT),
-	chunks_(size_ > 0 ? ((size_ - 1) / chunk_size_ + 1) : 0, Chunk_T(value), Allocator_T()), //unsigned overload on size=0
-	set_chunk_(~Chunk_T(0)),
-	one_chunk_(Chunk_T(1)),
-	zero_chunk_(Chunk_T(0))
+	chunks_(needed_chunks_(size_), value ? set_chunk_ : zero_chunk_, Allocator_T())
 {};
 
 template <typename Chunk_T, typename Allocator_T>
-constexpr Bitset <Chunk_T, Allocator_T>::Bitset(const std::initializer_list <bool> init) //negative size should throw a bad alloc on the vectors part(make sure)
+constexpr Bitset <Chunk_T, Allocator_T>::Bitset(const std::initializer_list <bool> init)
 	:
 	size_(init.size()),
-	chunk_size_(sizeof(Chunk_T) * CHAR_BIT),
-	chunks_(Allocator_T()),
-	set_chunk_(~Chunk_T(0)),
-	one_chunk_(Chunk_T(1)),
-	zero_chunk_(Chunk_T(0))
+	chunks_(Allocator_T())
 {
-	chunks_.reserve(size_ > 0 ? ((size_ - 1) / chunk_size_ + 1) : 0);
+	//optimized as to avoid checks and unneeded operations as much as possible (does anyone even use initializer list for big initializations lol?)
+	chunks_.reserve(needed_chunks_(size_));
+
+	Chunk_T temp_chunk = zero_chunk_;
 	auto curr_bit = init.begin();
-	for(std::size_t itr = 0; itr < chunks_.capacity(); ++itr)
+
+	const std::size_t full_chunks = size_ / chunk_size_;		//amount of bits that will be initialized as full chunks
+	for(int itr = 0; itr < full_chunks; ++itr)
 	{
-		Chunk_T temp_chunk = zero_chunk_;
-		for(std::size_t bit_pos = 0; curr_bit != init.end() && bit_pos < chunk_size_; ++curr_bit, ++bit_pos)
+		for(std::size_t bit_pos = 0; bit_pos < chunk_size_; ++bit_pos)
 		{
-			if(*curr_bit)
-			{
+			if(*(curr_bit++)) //check then increment
 				temp_chunk |= (one_chunk_ << bit_pos);
-			}
 		}
 
 		chunks_.push_back(temp_chunk);
+		temp_chunk = zero_chunk_;
 	}
+
+	const std::size_t remaining_bits = size_ % chunk_size_;		//the remaining (less than chunk_size_) bits that will be initialized as a half chunk
+	for(std::size_t bit_pos = 0; bit_pos < remaining_bits; ++bit_pos)
+	{
+		if(*(curr_bit++))
+			temp_chunk |= (one_chunk_ << bit_pos);
+	}
+
+	chunks_.push_back(temp_chunk);
 };
+
+
+//-------------------------ELEMENT ACCESS-------------------------
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr bool Bitset <Chunk_T, Allocator_T>::test(const std::size_t pos) const
+{
+	if(pos >= size_)
+		throw std::out_of_range(oor_msg_builder_("test", pos));
+
+	return chunks_[chunk_pos_(pos)] & (one_chunk_ << bit_pos_(pos));
+}
 
 
 //-------------------------CAPACITY-------------------------
 
 template <typename Chunk_T, typename Allocator_T> //pure
-std::size_t Bitset <Chunk_T, Allocator_T>::size() const
+constexpr std::size_t Bitset <Chunk_T, Allocator_T>::size() const noexcept
 {
 	return size_;
 }
 
 
-//-------------------------ELEMENT ACCESS-------------------------
-
-template <typename Chunk_T, typename Allocator_T> //pure
-bool Bitset <Chunk_T, Allocator_T>::test(const std::size_t pos) const
-{
-	if(pos >= size_)
-	{
-		throw std::out_of_range(throw_msg_builder("test", pos));
-	}
-
-	std::size_t chunk_pos = pos / chunk_size_;
-	std::size_t bit_pos = pos % chunk_size_;
-
-	if(chunks_[chunk_pos] & (one_chunk_ << bit_pos))
-		return true;
-	else
-		return false;
-}
-
-template <typename Chunk_T, typename Allocator_T> //pure
-typename Bitset <Chunk_T, Allocator_T>::Iterator Bitset <Chunk_T, Allocator_T>::operator [] (const std::size_t pos)
-{
-	return Iterator(pos, *this);
-}
-
-
-//-------------------------CONVERSIONS-------------------------
-
-template <typename Chunk_T, typename Allocator_T>
-template <typename Char_T, typename Traits_T, typename Alloc_T>
-std::basic_string <Char_T, Traits_T, Alloc_T> Bitset<Chunk_T, Allocator_T>::to_string(const Char_T zero, const Char_T one) const
-{
-	std::basic_string <Char_T, Traits_T, Alloc_T> tmp(size_, zero);
-
-	std::size_t pos = size_;
-	for(auto chunk : chunks_)
-	{
-		for(std::size_t bit_pos = 0; bit_pos < chunk_size_, pos-- > 0; ++ bit_pos)
-		{
-			if(chunk & (one_chunk_ << bit_pos))
-				Traits_T::assign(tmp[pos], one);
-		}
-	}
-
-	return tmp;
-}
-
-
 //-------------------------MODIFIERS-------------------------
 
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set()
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::clear() noexcept
+{
+	size_ = 0;
+	chunks_.clear(); //memory will still be allocated, but objects will be destroyed
+
+	return *this;
+}
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::resize(const std::size_t size, const bool value)
+{
+	set_unused_bits_(value); //set the newly added bits inside the last half chunk before doing any changes
+
+	size_ = size;
+	chunks_.resize(needed_chunks_(size), value ? set_chunk_ : zero_chunk_);
+
+	return *this;
+}
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set()
 {
 	std::fill(chunks_.begin(), chunks_.end(), set_chunk_);
 
 	return *this;
 }
 
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set(const std::size_t pos, const bool value)
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set(const std::size_t pos, const bool value)
 {
 	if(pos >= size_)
-	{
-		throw std::out_of_range(throw_msg_builder("set", pos));
-	}
-
-	std::size_t chunk_pos = pos / chunk_size_;
-	std::size_t bit_pos = pos % chunk_size_;
+		throw std::out_of_range(oor_msg_builder_("set", pos));
 
 	if(value)
-		chunks_[chunk_pos] |= (one_chunk_ << bit_pos);
+		chunks_[chunk_pos_(pos)] |= (one_chunk_ << bit_pos_(pos));
 	else
-		chunks_[chunk_pos] &= ~(one_chunk_ << bit_pos);
+		chunks_[chunk_pos_(pos)] &= ~(one_chunk_ << bit_pos_(pos));
 
 	return *this;
 }
 
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::reset()
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::reset()
 {
 	std::fill(chunks_.begin(), chunks_.end(), zero_chunk_);
 
 	return *this;
 }
 
-template <typename Chunk_T, typename Allocator_T> //recursively pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::reset(const std::size_t pos)
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::reset(const std::size_t pos)
 {
-	set(pos, 0);
+	set(pos, false);
 
 	return *this;
 }
 
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip()
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip()
 {
 	for(auto &itr : chunks_)
 		itr = ~itr;
@@ -342,109 +243,83 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip()
 	return *this;
 }
 
-template <typename Chunk_T, typename Allocator_T> //pure 
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip(const std::size_t pos)
+template <typename Chunk_T, typename Allocator_T> 
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip(const std::size_t pos)
 {
 	if(pos >= size_)
-	{
-		throw std::out_of_range(throw_msg_builder("flip", pos));
-	}
+		throw std::out_of_range(oor_msg_builder_("flip", pos));
 
-	std::size_t chunk_pos = pos / chunk_size_;
-	std::size_t bit_pos = pos % chunk_size_;
-
-	chunks_[chunk_pos] ^= (one_chunk_ << bit_pos);
+	chunks_[chunk_pos_(pos)] ^= (one_chunk_ << bit_pos_(pos));
 
 	return *this;
 }
 
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::resize(const std::size_t size)
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator &= (Bitset <Chunk_T, Allocator_T> &rhs)
 {
-	size_ = size;
-	chunks_.resize(size_ > 0 ? ((size_ - 1) / chunk_size_ + 1) : 0);
-}
+	std::size_t min_size = size_;
 
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::resize(const std::size_t size, const bool value)
-{
-	size_ = size;
-	chunks_.resize(size_ > 0 ? ((size_ - 1) / chunk_size_ + 1) : 0, value ? set_chunk_ : zero_chunk_);
-}
+	if(min_size > rhs.size_)
+	{
+		rhs.set_unused_bits_(true); //set the unused bits to 1 so that &op wont mess around with the result (only needed if rhs chunk overlaps with this and its got unused bits)
+		min_size = rhs.size_;
+	}
 
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::clear()
-{
-	size_ = 0;
-	chunks_.clear();
-}
-
-/*template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator &= (const Bitset <Chunk_T, Allocator_T> &rhs)
-{
-	//should the bitset grow in size if rhs is larger?
-	std::size_t length;
-
-	//all of this can be done in a range loop
-	if(size_ >= rhs.size_)
-		length = rhs.size_;
-	else
-		length = size_;
-
-	for(std::size_t itr = 0; itr < length; ++itr)
+	for(std::size_t itr = 0; itr < min_size; ++itr)
 		chunks_[itr] &= rhs.chunks_[itr];
 
 	return *this;
 }
 
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator |= (const Bitset <Chunk_T, Allocator_T> &rhs)
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator |= (Bitset <Chunk_T, Allocator_T> &rhs)
 {
-	std::size_t length;
+	std::size_t min_size = size_;
 
-	if(size_ >= rhs.size_)
-		length = rhs.size_;
-	else
-		length = size_;
+	if(min_size > rhs.size_)
+	{
+		rhs.set_unused_bits_(false); //set the unused bits to 0 so that &op wont mess around with the result (only needed if rhs chunk overlaps with this and its got unused bits)
+		min_size = rhs.size_;
+	}
 
-	for(std::size_t itr = 0; itr < length; ++itr)
+	for(std::size_t itr = 0; itr < min_size; ++itr)
 		chunks_[itr] |= rhs.chunks_[itr];
 
 	return *this;
 }
 
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator ^= (const Bitset <Chunk_T, Allocator_T> &rhs)
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator ^= (Bitset <Chunk_T, Allocator_T> &rhs)
 {
-	std::size_t length;
+	std::size_t min_size = size_;
 
-	if(size_ >= rhs.size_)
-		length = rhs.size_;
-	else
-		length = size_;
+	if(min_size > rhs.size_)
+	{
+		rhs.set_unused_bits_(false); //set the unused bits to 0 so that &op wont mess around with the result (only needed if rhs chunk overlaps with this and its got unused bits)
+		min_size = rhs.size_;
+	}
 
-	for(std::size_t itr = 0; itr < length; ++itr)
+	for(std::size_t itr = 0; itr < min_size; ++itr)
 		chunks_[itr] ^= rhs.chunks_[itr];
 
 	return *this;
 }
 
-template <typename Chunk_T, typename Allocator_T> //pure
-Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator ~ () const
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator ~ () const
 {
-	//reserve and push_back should be faster?
-	Bitset <Chunk_T, Allocator_T> flip(size_);
+	Bitset <Chunk_T, Allocator_T> flipped;
+	flipped.chunks_.reserve(chunks_.size());
+	flipped.size_ = size_;
 
-	for(std::size_t itr = 0; itr < chunks_.size(); ++itr)
-		flip.chunks_[itr] = ~chunks_[itr];
+	for(auto &chunk : chunks_)
+		flipped.chunks_.push_back(~chunk);
 
-	return flip;
-}*/
-
-
+	return flipped;
+}
 
 template <typename Chunk_T, typename Allocator_T>
-Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator << (const std::size_t pos) const
+constexpr Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator << (const std::size_t pos) const
 {
 	//shift chunks to right (increase value)
 	//unused bits should still be outside reach, therefore no need to mess with them
@@ -479,7 +354,7 @@ Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator << (const 
 }
 
 template <typename Chunk_T, typename Allocator_T>
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator <<= (const std::size_t pos)
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator <<= (const std::size_t pos)
 {
 	if(!pos)
 		return *this;
@@ -515,7 +390,7 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator <<= (cons
 }
 
 template <typename Chunk_T, typename Allocator_T>
-Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator >> (const std::size_t pos) const
+constexpr Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator >> (const std::size_t pos) //not const since might need to sanitize some bits...
 {
 	//shift chunks to left (decrease value)
 	//unused bits are definetely a problem...
@@ -524,6 +399,8 @@ Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator >> (const 
 
 	if(pos >= size_)
 		return Bitset <Chunk_T, Allocator_T>(size_);
+
+	set_unused_bits_(false);
 
 	Bitset <Chunk_T, Allocator_T> shifted(size_); //empty bitset
 
@@ -550,7 +427,7 @@ Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator >> (const 
 }
 
 template <typename Chunk_T, typename Allocator_T>
-Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator >>= (const std::size_t pos)
+constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator >>= (const std::size_t pos)
 {
 	//shift chunks to left (decrease value)
 	if(!pos)
@@ -561,6 +438,8 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator >>= (cons
 		std::fill(chunks_.begin(), chunks_.end(), zero_chunk_);
 		return *this;
 	}
+
+	set_unused_bits_(false);
 
 	const std::size_t left_offset = pos % chunk_size_; 				//left part (smaller) of the chunk will become the right (larger) part of the new chunk
 	const std::size_t right_offset = chunk_size_ - left_offset; 	//right part (larger) of the chunk will become the left (smallest) part of the new chunk
@@ -587,11 +466,34 @@ Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator >>= (cons
 }
 
 
+//-------------------------CONVERSIONS-------------------------
+
+template <typename Chunk_T, typename Allocator_T>
+template <typename Char_T, typename Traits_T, typename Str_Allocator_T>
+constexpr std::basic_string <Char_T, Traits_T, Str_Allocator_T> Bitset<Chunk_T, Allocator_T>::to_string(const Char_T zero, const Char_T one) const
+{
+	std::basic_string <Char_T, Traits_T, Str_Allocator_T> tmp(size_, zero);
+
+	std::size_t pos = size_;
+	for(auto chunk : chunks_)
+	{
+		for(std::size_t bit_pos = 0; bit_pos < chunk_size_ && pos-- > 0; ++ bit_pos)
+		{
+			if(chunk & (one_chunk_ << bit_pos))
+				Traits_T::assign(tmp[pos], one);
+		}
+	}
+
+	return tmp;
+};
+
+
 //-------------------------NON MEMBER FUNCTIOS-------------------------
 
-template <typename Chunk_T = unsigned long long, typename Allocator_T = std::allocator <Chunk_T>, typename Char_T, typename Traits_T> //pure
+template <typename Chunk_T, typename Allocator_T, typename Char_T, typename Traits_T>
 std::basic_ostream <Char_T, Traits_T>& operator << (std::basic_ostream <Char_T, Traits_T>&out, const Bitset <Chunk_T, Allocator_T> &mask)
 {
+	//i sure hope this is enough to make it portable, must investigate further
 	if(!mask.size_)
 		return out;
 
@@ -599,8 +501,65 @@ std::basic_ostream <Char_T, Traits_T>& operator << (std::basic_ostream <Char_T, 
 	Char_T one = std::use_facet <std::ctype <Char_T>>(out.getloc()).widen('1');
 
 	return out << mask.template to_string <Char_T, Traits_T, std::allocator <Char_T>> (zero, one);
+};
+
+
+//-------------------------private helpers/getters-------------------------
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr std::size_t Bitset <Chunk_T, Allocator_T>::needed_chunks_(const std::size_t size) const noexcept
+{
+	return size / chunk_size_ + (size % chunk_size_ > 0);
+};
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr std::size_t Bitset <Chunk_T, Allocator_T>::sizeof_chunk_() noexcept
+{
+	if constexpr (std::is_integral<Chunk_T>::value)
+		return sizeof(Chunk_T) * CHAR_BIT;
+	else
+		return Chunk_T::sizeof_ * CHAR_BIT;
 }
 
-//-------------------------class Bitset methods END-------------------------
-
+template <typename Chunk_T, typename Allocator_T>
+constexpr std::string Bitset <Chunk_T, Allocator_T>::oor_msg_builder_(const std::string &which, const std::size_t pos) const
+{
+	return std::string(		
+		"bit::Bitset::"
+		+ which
+		+ "(): pos (which is " 
+		+ std::to_string(pos) 
+		+ ") >= size() (which is " 
+		+ std::to_string(size_) 
+		+ ")"
+	);
 }
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr std::size_t Bitset <Chunk_T, Allocator_T>::chunk_pos_(const std::size_t pos) const noexcept
+{
+	return pos / chunk_size_;
+}
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr std::size_t Bitset <Chunk_T, Allocator_T>::bit_pos_(const std::size_t pos) const noexcept
+{
+	return pos % chunk_size_;
+}
+
+template <typename Chunk_T, typename Allocator_T>
+void Bitset <Chunk_T, Allocator_T>::set_unused_bits_(const bool value) //noexcept if chunks isnt empty !!!!MAKE SURE THIS WORKS
+{
+	std::size_t bit_pos = bit_pos_(size_);
+
+	if(bit_pos)
+	{
+		if(value)
+			chunks_.back() |= set_chunk_ << bit_pos; 					// 0000 0111
+		else
+			chunks_.back() &= ~(set_chunk_ << bit_pos);					// 1111 1000
+	}
+}
+
+
+} //namespace end
