@@ -25,6 +25,67 @@ private:
 	constexpr static Chunk_T one_chunk_ = Chunk_T(1);											//0000 0001
 	constexpr static Chunk_T zero_chunk_ = Chunk_T(0);											//0000 0000
 
+	//single bit abstraction
+	class Reference
+	{
+		Chunk_T &chunk_reference_;
+
+		const Chunk_T chunk_mask_true_;
+		const Chunk_T chunk_mask_false_;
+
+	public:
+
+		constexpr explicit Reference(Bitset <Chunk_T, Allocator_T>&, const std::size_t);
+
+		~Reference() noexcept = default;
+
+
+		constexpr operator bool () const noexcept;
+
+
+		constexpr Reference& operator = (const bool) noexcept;
+		constexpr Reference& operator = (const Reference&) noexcept;
+
+
+		constexpr Reference& operator &= (const bool) noexcept;
+		constexpr Reference& operator |= (const bool) noexcept;
+		constexpr Reference& operator ^= (const bool) noexcept;
+		constexpr bool operator~() const noexcept;
+
+
+	};
+
+public:
+
+
+	class Iterator
+	{
+
+	public:
+
+		constexpr explicit Iterator();
+
+		constexpr explicit Iterator(const Iterator&);
+
+		~Iterator() noexcept = default;
+
+
+		constexpr Iterator& operator ++ ();
+		constexpr Iterator operator ++ (std::size_t);
+		constexpr Iterator& operator -- ();
+		constexpr Iterator operator -- (std::size_t);
+
+		constexpr Iterator& operator += (std::size_t);
+		constexpr Iterator& operator -= (std::size_t);
+
+		constexpr Iterator operator + (std::size_t) const;
+		//constexpr friend Iterator operator + (std::size_t, const Iterator&);
+
+		constexpr Iterator operator - (std::size_t) const;
+		//constexpr friend Iterator operator - (std::size_t, const Iterator&);
+
+	};
+
 public:
 
 	constexpr explicit Bitset(const std::size_t = 0, const bool value = false); 				//default constructor							std::vector::vector() (3)
@@ -37,6 +98,8 @@ public:
 //-------------------------ELEMENT ACCESS-------------------------
 
 	constexpr bool test(const std::size_t) const;
+
+	constexpr Reference at(const std::size_t);
 
 
 //-------------------------CAPACITY-------------------------
@@ -162,7 +225,16 @@ constexpr bool Bitset <Chunk_T, Allocator_T>::test(const std::size_t pos) const
 		throw std::out_of_range(oor_msg_builder_("test", pos));
 
 	return chunks_[chunk_pos_(pos)] & (one_chunk_ << bit_pos_(pos));
-}
+};
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr typename Bitset <Chunk_T, Allocator_T>::Reference Bitset <Chunk_T, Allocator_T>::at(const std::size_t pos)
+{
+	if(pos >= size_)
+		throw std::out_of_range(oor_msg_builder_("at", pos));
+
+	return Reference(*this, pos);
+};
 
 
 //-------------------------CAPACITY-------------------------
@@ -171,7 +243,7 @@ template <typename Chunk_T, typename Allocator_T> //pure
 constexpr std::size_t Bitset <Chunk_T, Allocator_T>::size() const noexcept
 {
 	return size_;
-}
+};
 
 
 //-------------------------MODIFIERS-------------------------
@@ -183,7 +255,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::clear() 
 	chunks_.clear(); //memory will still be allocated, but objects will be destroyed
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::resize(const std::size_t size, const bool value)
@@ -194,7 +266,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::resize(c
 	chunks_.resize(needed_chunks_(size), value ? set_chunk_ : zero_chunk_);
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set()
@@ -202,7 +274,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set()
 	std::fill(chunks_.begin(), chunks_.end(), set_chunk_);
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set(const std::size_t pos, const bool value)
@@ -216,7 +288,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::set(cons
 		chunks_[chunk_pos_(pos)] &= ~(one_chunk_ << bit_pos_(pos));
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::reset()
@@ -224,7 +296,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::reset()
 	std::fill(chunks_.begin(), chunks_.end(), zero_chunk_);
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::reset(const std::size_t pos)
@@ -232,7 +304,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::reset(co
 	set(pos, false);
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip()
@@ -241,7 +313,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip()
 		itr = ~itr;
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T> 
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip(const std::size_t pos)
@@ -252,7 +324,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::flip(con
 	chunks_[chunk_pos_(pos)] ^= (one_chunk_ << bit_pos_(pos));
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator &= (Bitset <Chunk_T, Allocator_T> &rhs)
@@ -269,7 +341,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator
 		chunks_[itr] &= rhs.chunks_[itr];
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator |= (Bitset <Chunk_T, Allocator_T> &rhs)
@@ -286,7 +358,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator
 		chunks_[itr] |= rhs.chunks_[itr];
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator ^= (Bitset <Chunk_T, Allocator_T> &rhs)
@@ -303,7 +375,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator
 		chunks_[itr] ^= rhs.chunks_[itr];
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator ~ () const
@@ -316,7 +388,7 @@ constexpr Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator 
 		flipped.chunks_.push_back(~chunk);
 
 	return flipped;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator << (const std::size_t pos) const
@@ -351,7 +423,7 @@ constexpr Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator 
 	}
 
 	return shifted;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator <<= (const std::size_t pos)
@@ -387,7 +459,7 @@ constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator
 	std::fill(chunks_.begin(), chunks_.begin() + chunk_offset, zero_chunk_);
 
 	return *this;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator >> (const std::size_t pos) //not const since might need to sanitize some bits...
@@ -424,7 +496,7 @@ constexpr Bitset <Chunk_T, Allocator_T> Bitset <Chunk_T, Allocator_T>::operator 
 	}
 
 	return shifted;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr Bitset <Chunk_T, Allocator_T>& Bitset <Chunk_T, Allocator_T>::operator >>= (const std::size_t pos)
@@ -519,7 +591,7 @@ constexpr std::size_t Bitset <Chunk_T, Allocator_T>::sizeof_chunk_() noexcept
 		return sizeof(Chunk_T) * CHAR_BIT;
 	else
 		return Chunk_T::sizeof_ * CHAR_BIT;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr std::string Bitset <Chunk_T, Allocator_T>::oor_msg_builder_(const std::string &which, const std::size_t pos) const
@@ -533,19 +605,19 @@ constexpr std::string Bitset <Chunk_T, Allocator_T>::oor_msg_builder_(const std:
 		+ std::to_string(size_) 
 		+ ")"
 	);
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr std::size_t Bitset <Chunk_T, Allocator_T>::chunk_pos_(const std::size_t pos) const noexcept
 {
 	return pos / chunk_size_;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 constexpr std::size_t Bitset <Chunk_T, Allocator_T>::bit_pos_(const std::size_t pos) const noexcept
 {
 	return pos % chunk_size_;
-}
+};
 
 template <typename Chunk_T, typename Allocator_T>
 void Bitset <Chunk_T, Allocator_T>::set_unused_bits_(const bool value) //noexcept if chunks isnt empty !!!!MAKE SURE THIS WORKS
@@ -559,7 +631,79 @@ void Bitset <Chunk_T, Allocator_T>::set_unused_bits_(const bool value) //noexcep
 		else
 			chunks_.back() &= ~(set_chunk_ << bit_pos);					// 1111 1000
 	}
-}
+};
+
+
+/*
+============================================================================
+-------------------------class Reference methods BEGIN-------------------------
+============================================================================
+*/
+
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>::Reference::Reference(Bitset <Chunk_T, Allocator_T> &target, const std::size_t pos)
+	:
+	chunk_reference_(target.chunks_[target.chunk_pos_(pos)]),
+	chunk_mask_true_(one_chunk_ << target.bit_pos_(pos)),
+	chunk_mask_false_(~(one_chunk_ << target.bit_pos_(pos)))
+{};
+
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr Bitset <Chunk_T, Allocator_T>::Reference::operator bool () const noexcept
+{
+	return chunk_reference_ & chunk_mask_true_;
+};
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr typename Bitset <Chunk_T, Allocator_T>::Reference& Bitset <Chunk_T, Allocator_T>::Reference::operator = (const bool value) noexcept
+{
+	value ? chunk_reference_ |= chunk_mask_true_ : chunk_reference_ &= chunk_mask_false_;
+
+	return *this;
+};
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr typename Bitset <Chunk_T, Allocator_T>::Reference& Bitset <Chunk_T, Allocator_T>::Reference::operator = (const Bitset <Chunk_T, Allocator_T>::Reference& rhs) noexcept
+{
+	rhs ? chunk_reference_ |= chunk_mask_true_ : chunk_reference_ &= chunk_mask_false_;
+
+	return *this;
+};
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr typename Bitset <Chunk_T, Allocator_T>::Reference& Bitset <Chunk_T, Allocator_T>::Reference::operator &= (const bool value) noexcept
+{
+	if(!value) 
+		chunk_reference_ &= chunk_mask_false_;
+
+	return *this;
+};
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr typename Bitset <Chunk_T, Allocator_T>::Reference& Bitset <Chunk_T, Allocator_T>::Reference::operator |= (const bool value) noexcept
+{
+	if(value) 
+		chunk_reference_ |= chunk_mask_true_;
+
+	return *this;
+};
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr typename Bitset <Chunk_T, Allocator_T>::Reference& Bitset <Chunk_T, Allocator_T>::Reference::operator ^= (const bool value) noexcept
+{
+	if(value)
+		chunk_reference_ ^= chunk_mask_true_;
+
+	return *this;
+};
+
+template <typename Chunk_T, typename Allocator_T>
+constexpr bool Bitset <Chunk_T, Allocator_T>::Reference::operator ~ () const noexcept
+{
+	return !(chunk_reference_ & chunk_mask_true_);
+};
 
 
 } //namespace end

@@ -1,5 +1,5 @@
 #include <iostream>
-#include "dynamic_bitset_cleanup.hpp"
+#include "dynamic_bitset.hpp"
 #include <vector>
 
 int main()
@@ -84,6 +84,33 @@ int main()
 	a ^= b;
 	std::cout << b << std::endl;
 	std::cout << a << std::endl;
+
+	std::cout << std::endl;
+
+	std::cout << b << std::endl;
+	b.set(24, 0);
+	b.set(23, 0);
+	std::cout << b.at(24) << std::endl;
+	std::cout << b.at(23) << std::endl;
+	b.at(23) = b.at(0);
+	std::cout << b.at(0) << std::endl;
+
+	std::cout << b << std::endl;
+	b.at(23) &= b.at(24);
+	std::cout << b << std::endl;
+
+	std::vector <int> wtf({1,2,3,4,5});
+
+	for(auto &itr : wtf)
+	{
+		itr = 3;
+		std::cout << itr << ' ';
+	}
+
+	for(auto itr : wtf)
+	{
+		std::cout << itr << ' ';
+	}
 
 	/*std::cout << (b << 63) << std::endl;
 	b[63] = false;
